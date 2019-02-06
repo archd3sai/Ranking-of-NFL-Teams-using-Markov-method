@@ -1,0 +1,130 @@
+---
+title: "609 Assignment-1: Ranking NFL Teams"
+author: "Arch Jignesh Desai"
+date: "October 23, 2018"
+output: word_document
+---
+
+```{r}
+library(openxlsx)
+library(markovchain)
+options(max.print=9999)
+scores <- read.xlsx("C:/Users/Dell/Desktop/609 A1/Modified.xlsx")
+dim(scores)
+head(scores, 16)
+```
+
+```{r}
+Team1<-scores$`Winner/tie`[1:16]
+Team2<-scores$`Loser/tie`[1:16]
+Teams <- c(Team1,Team2)
+Teams
+```
+
+```{r}
+TransMatrix1 = matrix(0, nrow = 32, ncol=32)
+for(i in 1:32){
+  for(j in 1:256){
+    if(scores$`Winner/tie`[j] == Teams[i]){
+      TransMatrix1[i,i] = TransMatrix1[i,i] + (scores$PtsW[j]/(scores$PtsW[j] + scores$PtsL[j]))
+      
+      index <- which(Teams == scores$`Loser/tie`[j])
+      TransMatrix1[i,index] = TransMatrix1[i,index] + (scores$PtsL[j]/(scores$PtsW[j] + scores$PtsL[j]))
+    }
+    
+    if(scores$`Loser/tie`[j] == Teams[i]){
+      TransMatrix1[i,i] = TransMatrix1[i,i] + (scores$PtsL[j]/(scores$PtsW[j] + scores$PtsL[j]))
+      
+      index <- which(Teams == scores$`Winner/tie`[j])
+      TransMatrix1[i,index] = TransMatrix1[i,index] + (scores$PtsW[j]/(scores$PtsW[j] + scores$PtsL[j]))
+    }
+  }
+}
+TransMatrix1 = TransMatrix1/16
+
+```
+
+
+```{r}
+dtmc1 <- new("markovchain", states = Teams, transitionMatrix = TransMatrix1, name = "Ranking1")
+t(steadyStates(dtmc1))
+```
+
+```{r}
+R1 <- steadyStates(dtmc1)
+FinalRank1 <- data.frame(R1[1,], rank(-R1))
+names(FinalRank1)<-c("Probs1","Ranks1")
+FinalRank1[order(FinalRank1$Ranks1),]
+```
+
+```{r}
+TransMatrix2 = matrix(0, nrow = 32, ncol=32)
+for(i in 1:256){
+  indexW <- which(Teams == scores$`Winner/tie`[i])
+  indexL <- which(Teams == scores$`Loser/tie`[i])
+  TransMatrix2[indexL,indexW] = TransMatrix2[indexL,indexW] + scores$PtsW[i] - scores$PtsL[i]
+}
+
+sum = 0
+for(j in 1:32){
+  for(k in 1:32){
+    sum = sum + TransMatrix2[j,k]
+  }
+  if(sum != 0){
+    TransMatrix2[j,] = TransMatrix2[j,]/sum
+  }
+  else{
+    rowNumber = j
+  }
+  sum = 0
+}
+for(j in 1:32){
+  TransMatrix2[rowNumber,j]= 1/32
+}
+
+dtmc2 <- new("markovchain", states = Teams, transitionMatrix = TransMatrix2, name = "Ranking2")
+t(steadyStates(dtmc2))
+
+R2 <- steadyStates(dtmc2)
+FinalRank2 <- data.frame(R2[1,], rank(-R2))
+names(FinalRank2)<-c("Probs2","Ranks2")
+FinalRank2[order(FinalRank2$Ranks2), ]
+```
+
+
+```{r}
+TransMatrix3 = matrix(0, nrow = 32, ncol=32)
+for(i in 1:256){
+  indexW <- which(Teams == scores$`Winner/tie`[i])
+  indexL <- which(Teams == scores$`Loser/tie`[i])
+  TransMatrix3[indexL,indexW] = TransMatrix3[indexL,indexW] + scores$PtsW[i]
+  TransMatrix3[indexW,indexL] = TransMatrix3[indexW,indexL] + scores$PtsL[i]
+}
+sum = 0
+for(j in 1:32){
+  for(k in 1:32){
+    sum = sum + TransMatrix3[j,k]
+  }
+  if(sum != 0){
+    TransMatrix3[j,] = TransMatrix3[j,]/sum
+  }
+  sum = 0
+}
+
+
+```
+
+```{r}
+dtmc3 <- new("markovchain", states = Teams, transitionMatrix = TransMatrix3, name = "Ranking3")
+t(steadyStates(dtmc3))
+
+R3 <- steadyStates(dtmc3)
+FinalRank3 <- data.frame(R3[1,], rank(-R3))
+names(FinalRank3)<-c("Probs3","Ranks3")
+FinalRank3[order(FinalRank3$Ranks3),]
+```
+```{r}
+compareRanks<- cbind.data.frame(Teams,FinalRank1[,2],FinalRank2[,2],FinalRank3[,2])
+compareRanks
+```
+
